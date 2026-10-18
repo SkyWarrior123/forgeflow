@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: forgeflow
+      POSTGRES_PASSWORD: forgeflow
+      POSTGRES_DB: forgeflow
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgeflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  ml:
+    build: ./ml/serving
+    ports:
+      - "8001:8001"
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ml:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://forgeflow:forgeflow@postgres:5432/forgeflow
+      REPOSITORY: postgres
+      BIND_ADDR: 0.0.0.0:8080
+      INGEST_API_KEY: dev-ingest-key
+      UI_API_KEY: dev-ui-key
+      ML_SCORING_URL: http://ml:8001
+      CORS_ORIGINS: http://localhost:5173
+      RUST_LOG: info,forgeflow=debug
+    ports:
+      - "8080:8080"
